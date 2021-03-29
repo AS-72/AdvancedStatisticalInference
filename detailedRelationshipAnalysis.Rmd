@@ -1,0 +1,347 @@
+---
+title: "Exam"
+author: "Anthony Stachowski"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Section 1  
+
+## Instructions  
+
+Using the following data, produce a visualization with patient_days_admitted on the x-axis and dollar_spent_per_patient on the y-axis. After producing this visualization, explain what this relationship means and how this relationship might guide a decision.
+
+After looking at the bivariate relationship in the previous visualization, add department to the visualization as a grouping variable. Does this change your interpretation of the relationship or add any expanded understanding? If so, how? Does this visualization offer any additional explanatory power over the more simple visualization? Explain.
+
+
+```{r, message=FALSE}
+library(readr)
+library(dplyr)
+
+sec1Link <- "https://www.nd.edu/~sberry5/data/visualizationData.csv"
+
+sec1Data = read.csv(sec1Link)
+glimpse(sec1Data)
+```
+
+Examine relationship between patient_days_admitted (numeric field - continuous variable) and dollar_spent_per_patient (numeric field - continuous variable).
+
+```{r, message=FALSE}
+library(ggplot2)
+
+ggplot(sec1Data, aes(x = patient_days_admitted, y = dollar_spent_per_patient)) + 
+  geom_point() +
+  theme_minimal()
+```
+
+Based on the above visualization, there does appear to be a positive relationship between how many days a patient has been admitted and the total dollars spent per patient: the longer the patient has been admitted, the more money spent on that patient.  However, it does not appear to be a perfectly linear relationship and may be more of a step-wise function with a dividing point around 16-17 days.
+
+```{r}
+sec1Data %>%
+  group_by(department) %>%
+  ggplot(., aes(x = patient_days_admitted, y = dollar_spent_per_patient)) +
+  geom_point(aes(color = department)) +
+  facet_wrap(~department) +
+  theme(legend.position = "none")
+```
+
+This visualization does change my perception as including information by department provides further detail that offers more information.  While the general positive relationship betweene patient days admitted and how much money is spent per patient remains true, the relationship appears to be more linear when outcomes are grouped by department.  The above visualization also shows that the mean expense per patient is also different by department with the average spend per patient in the cancer department being the largest and the general department being the smallest.  This visualization would allow you to account for differences by department if you are attempting to reduce spending per patient as this indicates that there are very different starting points, even if the length of stay is very short.
+
+# Section 2  
+
+## Instructions   
+
+Using the following data, formulate a hypothesis for training.sessions.attended.year's effect on customer.satisfaction.scores.year. Please clearly state the relationship that you would expect to find. Using an appropriate technique from the general linear model, test your hypothesis and report your findings -- interpretation of your model's coefficients is critical. Describe your rationale for any data processing (e.g., centering) that you might undertake.
+
+After reporting and interpreting your findings, conduct a post hoc power analysis to determine if you had a sufficient sample size to detect an effect. Discuss the results from your power analysis.
+
+```{r}
+sec2Link <- "https://www.nd.edu/~sberry5/data/glmData.csv"
+
+sec2Data = read.csv(sec2Link)
+
+glimpse(sec2Data)
+summary(sec2Data)
+
+which(is.na(sec2Data$customer.satisfaction.scores.year))
+which(is.na(sec2Data$training.sessions.attended.year))
+which(is.na(sec2Data$csr.id))
+```
+```{r}
+
+ggplot(sec2Data, aes(x = training.sessions.attended.year)) + 
+  geom_histogram() +
+  theme_minimal()
+```
+
+The distribution of training sessions attended for the year is pretty even.  I am going to choose not to mean-center this variable as I want my intercept to reflect the customer satisfaction level for a person who has not attended any training sessions.  Mean-centering would mean that my intercept reflects the customer satisfaction level at the mean number of sessions attended (which is 5.96 here).  Centering can be useful if there are large differences that may skew the results, as for this data it is pretty evently spread over the number of sessions, it would likely not be needed.
+
+#### Null Hypothesis
+The linear relationship between **training.sessions.attended.year** and **customer.satisfaction.scores.year** is not different from zero (i.e. the coefficient of **training.sessions.attended.year** in a linear relationship with **customer.satisfaction.scores.year** is equal to zero).
+
+```{r}
+
+hypothesis1 = lm(customer.satisfaction.scores.year ~ training.sessions.attended.year, data = sec2Data)
+
+summary(hypothesis1)
+
+ggplot(data = sec2Data, aes(x = training.sessions.attended.year, y = customer.satisfaction.scores.year)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_minimal()
+```
+
+The coefficient of **training.sessions.attended.year** is significant at p=0.001, which is stronger than the significance level of 0.05 that is typically used when assessing statistical significance. Therefore, based on reviewing the p-value of this linear model, we can reject the null hypothesis, as the coefficient of **training.sessions.attended.year** is different from zero as indicated by the p-value. There is a positive relationship between **training.sessions.attended.year** and **customer.satisfaction.scores.year**, as the number of training sessions attended grows, satisfaction score increases.
+
+The intercept (61.30) for this model indicates the satisfaction level if a person attends 0 training sessions.  With each additional training session, customer satisfaction grows by 2.47 units. 
+
+This model has $$R^2_{adjusted} = 0.4377$$ and therefore the number of training sessions does a moderate job of explaining the change in customer satisfaction.  Other variables are needed to better explain customer satisfaction.
+
+#### Post Hoc Power Analysis:
+
+```{r, message=FALSE}
+library(pwr)
+
+pwr.f2.test(u = (2-1), v = (529-2) , f2 = 0.4377/(1-0.4377), sig.level = 0.001, power = NULL)
+```
+
+In the above model we have 2 coefficients (1 IV and 1 intercept), which gives a **u** value of 1.
+
+We had 529 observations for this analysis, so the **v** value is 527 (n-k = 529-2).
+
+Using $$R^2_{adjusted} = 0.4377$$ for the f^2 calculation results in a **f^2** value of 0.778.
+
+The significance level of the coefficient in the above model was 0.001 and therefore it was used for the **sig.level** in the post hoc power analysis.
+
+Inputing these values, we see that this test results in a **power** level of 1.  Typically we would want the power level to be at least 0.8 which is a 4:1 tradeoff between Type II and Type I errors and therefore our result gives us a large enough value to make the conclusions about the value of the model.
+
+
+# Section 3  
+
+## Instructions   
+
+Consider the following A/B testing data. This data tracks a user's time on page (timeOnPage) and the UI design (design). In A/B testing, we are concerned with the difference between the two groups on the outcome. Select the appropriate technique from the general linear model and determine if any significant differences exist between the two competing page designs. Describe your rationale for any data processing that you might undertake.
+
+Discuss your results and indicate any actionable decision that comes from your analysis. Additionally, determine if your analyses were sufficiently powered.
+
+```{r}
+sec3Link <- "https://www.nd.edu/~sberry5/data/abData.csv"
+
+sec3Data = read.csv(sec3Link)
+
+glimpse(sec3Data)
+summary(sec3Data)
+```
+
+#### Null Hypothesis
+The relationship between **PageConfiguration** and **MinutesOnPage** is not different from zero (i.e. the coefficient of **PageConfiguration** in a linear relationship with **MinutesOnPage** is equal to zero).
+
+This model, while using linear regression, is a little different than linear regression when the independent variable is continuous.  In this case, the independent variable being tested is binary (either A or B).  The coefficient, if significant, will indicate that there is a difference in outcome of how long the person spends on the page given it is the design of one type.  If the coefficient is positive, then the presence of the factor indicates that they are more likely to spend more time on the page than if the other factor is present.  If the coefficient is negative, then the presence of the factor indicates that they are more likely to spend less time on the page than if the other factor is present.
+
+```{r}
+
+hypothesis2 = lm(MinutesOnPage ~ PageConfiguration, data = sec3Data)
+
+summary(hypothesis2)
+
+ggplot(data = sec3Data, aes(x = PageConfiguration, y = MinutesOnPage)) +
+  geom_boxplot() +
+  geom_jitter(color = "blue3", alpha = 0.5) +
+  theme_minimal()
+```
+The coefficient of **PageConfigurationB** is significant at p=0.001, which is certainly stronger than the significance level of 0.05 that is typically used when assessing statistical significance. Therefore, based on reviewing the p-value of this linear model, we can reject the null hypothesis, as the coefficient of **PageConfigurationB** is different from zero as indicated by the p-value. There is a positive relationship between **MinutesOnPage** and **PageConfigurationB**, if a person is viewing a webpage of design B they are likely to spend 2.94721 minutes less than if the webpage is of design A (**PageConfigurationB** represents design B being present, if design A is present then the x-value is 0, which removes this effect from the model).  The intercept (5.97486) for this model indicates the minutes spent on the page of a person who is viewing a webpage of design A. 
+
+This model has $$R^2_{adjusted} = 0.894$$ and therefore the Page Configuration variable does a good job of explaining the change in time spent on the webpage.  Other variables could be additionally considered to increase the fit of the model.
+
+#### Post Hoc Power Analysis:
+
+```{r}
+
+pwr.f2.test(u = (2-1), v = (1059-2) , f2 = 0.894/(1-0.894), sig.level = 0.001, power = NULL)
+```
+In the above model we have 2 coefficients (1 Dummy IV and 1 intercept), which gives a **u** value of 1.
+
+We had 1,059 observations for this analysis, so the **v** value is 1,057 (n-k = 1059-2).
+
+Using $$R^2_{adjusted} = 0.894$$ for the f^2 calculation results in a **f^2** value of 8.433962.
+
+The significance level of the coefficient in the above model was 0.001 and therefore it was used for the **sig.level** in the post hoc power analysis.
+
+Inputing these values, we see that this test results in a **power** level of 1.  Typically we would want the power level to be at least 0.8 which is a 4:1 tradeoff between Type II and Type I errors and therefore our result gives us a large enough value to make the conclusions about the value of the model.
+
+# Section 4  
+
+## Instructions   
+
+Using the following data, determine if there are any differences in the daily net profit of three different store locations. Select the appropriate test from the general linear model and determine if any significant differences exist. Describe your rationale for any data processing that you might undertake. 
+
+Discuss your results.
+
+```{r}
+sec4Link <- "https://www.nd.edu/~sberry5/data/performanceData.csv"
+
+sec4Data = read.csv(sec4Link)
+
+glimpse(sec4Data)
+summary(sec4Data)
+```
+
+#### Visulaizing the Data
+
+```{r}
+
+ggplot(data = sec4Data, aes(x = facility_location, y = daily_net_profit_thousand)) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.5) +
+  theme_minimal()
+```
+There does appear to be a difference in daily net profit by location.  It looks like 10 Maple and 710 Oakland have similar daily profits and therefore there could be an argument to group these variables together.  However, I will begin by leaving them separate and see if there is a difference, even if visually they appear to be similar.
+
+#### Null Hypothesis
+The relationship between **facility_location** and **daily_net_profit_thousand** is not different from zero (i.e. the coefficient of **facility_location** in a linear relationship with **daily_net_profit_thousand** is equal to zero).
+
+This model, while using linear regression, is a little different than linear regression when the independent variable is continuous.  In this case, the independent variable being tested is categorical (either 10 Maple or 403 Barr or 710 Oakland).  This will result in 2 dummy variables.  The coefficient for these dummy variables, if significant, will indicate that there is a difference in outcome of daily net profits based on the location of the facility when distinguised from the base case, which will be captured by the intercept.
+
+```{r}
+
+hypothesis3 = lm(daily_net_profit_thousand ~ facility_location, data = sec4Data)
+
+summary(hypothesis3)
+```
+The results confirm the information I discussed above based on the visual.  The coefficient of 403 Barr is significant at p=0.001, which supports rejecting the null hypothesis.  The net daily profit for 403 Barr is different from the net daily profit of 10 Maple, which is captured by the intercept.  Based on the model, the net daily profit for 10 Maple is 5.026K and the net daily profit for 403 Barr is 3.451K lager.
+
+The coefficient of 710 Oakland is not significant and thus the model indicates that its net daily profit is not difference from 10 Maple.  Therefore, I would expect that its net daily profit would be very similar to 5.026K.  The model can be re-run with these two facilities grouped into one factor and have 403 Barr be left separate.
+
+```{r}
+
+sec4DataAdjusted = sec4Data %>%
+  mutate(facility_location = as.factor(ifelse(facility_location == "403 Barr",
+                                              as.character("403 Barr"),
+                                              as.character("10 Maple & 710 Oakland"))))
+
+hypothesis4 = lm(daily_net_profit_thousand ~ facility_location, data = sec4DataAdjusted)
+
+summary(hypothesis4)
+```
+We now arrive at coefficients that are all signficant.  The coefficient of 403 Barr is significant at p=0.001, which supports rejecting the null hypothesis.  The net daily profit for 403 Barr is different from the net daily profit of 10 Maple & 710 Oakland, which is captured by the intercept.  Based on the model, the net daily profit for 10 Maple & 710 Oakland is 4.974K and the net daily profit for 403 Barr is 3.502K lager.
+
+This model has $$R^2_{adjusted} = 0.5519$$ and therefore the facility location variable does a moderate job of explaining the change in daily net profit.  Other variables could be additionally considered to increase the fit of the model.
+
+#### Post Hoc Power Analysis:
+
+```{r}
+
+pwr.f2.test(u = (2-1), v = (1095-2) , f2 = 0.5519/(1-0.5519), sig.level = 0.001, power = NULL)
+```
+In the adjusted model (hypothesis 4) we have 1 coefficient (1 Dummy IV and 1 intercept), which gives a **u** value of 1.
+
+We had 1,095 observations for this analysis, so the **v** value is 1,093 (n-k = 1095-2).
+
+Using $$R^2_{adjusted} = 0.5518$$ for the f^2 calculation results in a **f^2** value of 1.231645.
+
+The significance level of the coefficient in the above model was 0.001 and therefore it was used for the **sig.level** in the post hoc power analysis.
+
+Inputing these values, we see that this test results in a **power** level of 1.  Typically we would want the power level to be at least 0.8 which is a 4:1 tradeoff between Type II and Type I errors and therefore our result gives us a large enough value to make the conclusions about the value of the model.
+
+# Section 5  
+
+## Instructions   
+
+Using the following data, determine what variables influence a franchise's ultimate outcome -- failure or success. Using any variables available to you, select the appropriate method and test your model. Discuss your results and describe your rationale for any data processing that you might undertake.
+
+```{r}
+sec5Link <- "https://www.nd.edu/~sberry5/data/outcomeData.csv"
+
+
+sec5Data = read.csv(sec5Link)
+
+# Assessing the data set:
+glimpse(sec5Data)
+summary(sec5Data)
+
+# Checking for null values:
+which(is.na(sec5Data))
+```
+
+The dependent variable, **outcomeClosedOpen**, is binary with "1" indicating that the store stays open and "0" indicating that the store closes.  Given this, I will use a logistic regression to assemble a model for predicting whether a store will stay open or will close.  In order to do this, I will divide the dataset into two groups: one for training and one for testing. The training set will have 70% of the observations and the test set will have 30% of the observations.
+
+```{r}
+# Change dependent variable to factor for logistic regression:
+
+sec5Data$outcomeClosedOpen = as.factor(sec5Data$outcomeClosedOpen)
+```
+
+
+Determine how many rows correspnds to 70% of the data set, rounding down:
+```{r}
+trainingSetSize = floor(0.70*nrow(sec5Data))
+
+trainingSetSize
+```
+
+Identify row indices for building a training set and then being able to identify test set:
+```{r}
+
+set.seed(123)
+trainingSetIndicator = sample(seq_len(nrow(sec5Data)),size = trainingSetSize)
+
+trainingSet = sec5Data[trainingSetIndicator,]
+testSet = sec5Data[-trainingSetIndicator,]
+```
+
+I will now look at my trainingSet in a little more detail to begin determining what variables it might be best to include:
+
+```{r}
+trainingSet %>%
+  ggplot(., aes(x = outcomeClosedOpen, y = peoplePerSqMile)) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.5) +
+  theme_minimal()
+
+trainingSet %>%
+  ggplot(., aes(x = outcomeClosedOpen, y = employeeCount)) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.5) +
+  theme_minimal()
+
+trainingSet %>%
+  ggplot(., aes(x = outcomeClosedOpen, y = dailyNetProfitThousands)) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.5) +
+  theme_minimal()
+```
+
+There appears to be a very strong relationship between **dailyNetProfitThousands** and whether a store stays open or closes.  I also looked at **employeeCount**, but it does not appear to have as strong of a relationship with whether a store stays open or closes.  **PeoplePerSqMile** looks to have a pretty strong relationship with whether a store stays open.  I also need to be concerned with overfitting the model on my training set and it not being a good predictor for the test set.  There appears to be a perfect correlation between **dailyNetProfitThousands** and the store staying open (anything above 6.5K means the store stays open), which would be extremely easy to use for the training set as it would perefectly match the outcomes.  However, this might not be the case in the testing set.  There could also be something odd happening in regards to how data around daily profits and stores staying opened are collected.  Without knowing this, I will stay away from utilizing daily net profits and instead will focis on **peoplePerSqMile**:
+
+```{r}
+logisticRegressionStore = glm(outcomeClosedOpen ~ peoplePerSqMile, data = trainingSet, family = binomial(link = "logit"))
+
+summary(logisticRegressionStore)
+```
+
+The intercept and coefficient in this model are both significants at p=0.001 and the model did converge.  Therefore, on the surface it appears to do a good job in matching the outcome of whether a store stays open.  I will now generate predictions on the test set and build a confusion matrix at a cutoff level of 0.5:
+
+```{r, message=FALSE}
+library(caret)
+
+# Applying models to the test set:
+test1 = predict(logisticRegressionStore, newdata = testSet, type = "response")
+
+# 50% level:
+test1_50 = ifelse(test1>0.5,1,0)
+test1_50 = as.factor(test1_50)
+
+# Creating confusion matrix at 0.5 level:
+confusionMatrix(test1_50, testSet$outcomeClosedOpen)
+```
+
+Of the 143 events in the test set, the proposed model predicted correctly that the store stayed open 56 times and predicted correctly that the store closed 82 times.
+
+The model predicted the store would stay open 2 times, but the store actually closed (false positive). This leads to a false positive rate of 2.4% (Predicted to stay open when actually closed / Total Actual Closes = 2 / (2 + 82)).
+
+The model predicted the store would close 3 times, but it actually stayed open (false negative). This leas to a false negative rate of 5.1% (Predicted to close when the store actually stayed open / Total Actual Opens = 3 / (3 + 56)).
+
+This leads to an error rate of 3.5% ((False Positive + False Negative) / Total Events = (2 + 3) / 143).  This model does a good job of projecting which stores will stay open with also being rather simple: there is only 1 independent variable that should be relatively easy to collect.  Therefore, it would likely be a good candidate for helping the company project which stores will stay open.
