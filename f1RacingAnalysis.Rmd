@@ -1,0 +1,245 @@
+---
+title: "F1 Racing Analysis"
+author: "Anthony Stachowski"
+date: "May 4, 2020"
+output: 
+  slidy_presentation:
+    font_adjustment: -3
+---
+# Data Exploration and Visualization:
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+<div class = "notes">
+Presentation Notes on Data:
+
+**Notes on the Race Data:**
+
+A few notes on this data file, it is an assembly of multiple data files from http://ergast.com/mrd/.  There is lots of data summarized in this file and not all will be necessary for analysis.  There is another key file on lap time information that may also be useful, but was not included in this summary file due to the size of that file.
+
+The file contains information for each race from 1950 - 2019 that had information.
+
+In some cases there was missing data when assembling different tables and these are indicated by blanks in the CSV file.  For example, for certain races there was no information on qualifying times.  It does not mean that qualifying did not occur, but rather that the data was not stored.
+
+In other instances, a `"\N"` is indicated in the data set to show that the data was recorded, but for some reason was not included.  This could be due to the data not being valid for a certain category (for example, some qualifying rounds do not include data because the driver was not eligible for that round) or could possibly indicate that there were multiple values that could have been provided for one variable.
+
+In addition to the files that were brought together from the above data source, we added some circuit classification fields to these files based on information about the circuits from the following Wikipedia page: https://en.Wikipedia.org/wiki/List_of_Formula_One_circuits.
+
+The classification is street, road, and race.  Street circuits are held on closed streets.  Road circuits are held on a mixture of public roads and a permanent track.  Race circuits are held at permanent facilities.  Finally, we added an additional category: temporary circuits, which are ones that have had 3 or less races in the history of Formula 1 from 1950-2019.  The classification based on the three categories and the classification based on the four categories will both be evaluated.
+
+Additional columns were added to the information from the F1 data site to capture a performance analysis for evaluating the relative competitiveness of each race event.  This was built considering a driver's relative performance (i.e. driver finishing position divided by the number of drivers in the field) and their history at the circuit.  Two measures were considered: (1) lagged average and (2) total average.  The **lagged** average considered only the driver's previous performance at the track.  For example, if we are looking at Hamilton at the Monaco Grand Prix in the 2009 season, the competitiveness rating would only be determined by his relative performance at previous Monaco Grand Prix races.  The **total** average considers all of the driver's races at the given track regardless of the season.  Back to the Hamilton example, the total average would consider his relative performance at the 2009 race and all other Monaco Grand Prix races up until the end of the data collection period (i.e. 2019).  There are benefits and drawbacks to both versions.
+
+A similar calculation was done to assess the relative competitiveness of each race at the constructor level.  The calculation was adjusted to account for the fact that constructors can utilize two cars per race.
+
+A calculated points column was also built for the data set.  Point structures have changed over time and therefore a consistent measure was chosen to assess driver and constructor performance.  This calculation uses the point system from 1991-2002 as a starting point and then adds an additional mechanism for assigning points to every finishing position (which is different from F1 point structuring).  The points are scored as follows: 1st place, 10 points; 2nd place, 6 points; 3rd place, 4 points; 4th place, 3 points; 5th place, 2 points; 6th place, 1 point; and 7th place and lower, $(0.1^2)^{(position-6)}$.  These additional points are small enough (begin at 0.01 and proceed lower) that they should not distort results while also assessing performance over time.
+
+**Importing the First Data set:**
+
+```{r Data Import, warning=FALSE, message=FALSE}
+library(readr)
+
+data_url = "https://github.com/AS-72/Sports-Analytics/blob/master/f1RacingDataAggregation.csv?raw=true"
+
+f1Racing = read_csv(data_url)
+
+```
+
+Summarizing and viewing some of the data:
+
+```{r Data View, warning=FALSE, message=FALSE}
+library(dplyr)
+
+glimpse(f1Racing)
+
+```
+
+**Data Cleaning:**
+
+Cleaning and selecting pertinent information from the above data set for initial analysis:
+
+```{r Data Cleaning}
+
+# Selecting the columns needed, by removing ones that are not needed for this analysis:
+selectData = f1Racing %>%
+  dplyr::select(-number, -position, -positionText, -laps, -time, -milliseconds, -fastestLap, -rank, -fastestLapTime,
+         -fastestLapSpeed, -date, -time_1, -nationality, -carNumber, -forename, -surname, -dob, -nationality_1,
+         -qualifiedPosition, -q1, -q2, -q3, -totalPitStops, -totalPitDuration, -totalPitMiliseconds, 
+         -constructorPosition, -constructorPositionText, -constructorWins)
+
+# Changing the variable types:
+selectData$resultId = as.factor(selectData$resultId)
+selectData$raceId = as.factor(selectData$raceId)
+selectData$driverId = as.factor(selectData$driverId)
+selectData$constructorId = as.factor(selectData$constructorId)
+selectData$startingGrid = as.ordered(selectData$startingGrid)
+selectData$finishingPosition = as.ordered(selectData$finishingPosition)
+selectData$statusId = as.factor(selectData$statusId)
+selectData$round = as.ordered(selectData$round)
+selectData$circuitId = as.factor(selectData$circuitId)
+selectData$classification_1 = as.factor(selectData$classification_1)
+selectData$classification_2 = as.factor(selectData$classification_2)
+selectData$classification_3 = as.factor(selectData$classification_3)
+selectData$code = as.factor(selectData$code)
+selectData$finishingStatus = as.factor(selectData$finishingStatus)
+
+# Renaming columns and creating numeric finishing position variable:
+selectData = selectData %>%
+  rename(grandPrixName = name, circuitName = name_1, constructorName = name_2, driverNameCode = code) %>%
+  mutate(finishingNumber = as.numeric(finishingPosition)) %>%
+  mutate(yearCategory = as.factor(year))
+
+summary(selectData)
+
+```
+</div>
+
+F1 has been in existence since 1950 and this is how many drivers and constructors (i.e. teams) have participated each year:
+
+```{r Exploration and Visualization 1, message=FALSE, echo=FALSE}
+library(ggplot2)
+
+# Number of drivers and constructor by season:
+selectData %>%
+  group_by(year) %>%
+  summarise(countDriver = n_distinct(driverId), countConstructor = n_distinct(constructorId)) %>%
+  ggplot(., aes(x = year)) +
+  geom_line(aes(y = countDriver), color = "blue3") +
+  geom_line(aes(y = countConstructor), color = "darkgreen") +
+  geom_vline(xintercept = 1981, color = "darkred") +
+  theme_minimal() +
+  ylab("count") +
+  ggtitle("Drivers (Blue) and Constructors (Green) by Season: 1950-2019")
+```
+
+- The year 1981 is highlighted here due to a rules change that significantly altered driver and team structuring.
+- My hypotheses will focus on races from 1981-2019 because of this.
+
+<div class = "notes">
+Presentation Notes:
+
+In the year 1981, F1 racing set newly organized standards that created a new era for racing.  Regulations were put into place around constructors fielding vehicles and sponsoring drivers, which brought about significant changes.  This can be seen in the graph that counted the number of unique drivers by season.  After 1981, there has been a more consistent number of drivers per season.  More consistency developed even more so in the early 2000s around driver and constructor counts.  However, we need to balance this consistency with ensuring that we have enough data points. Therefore, we will focus on analyzing performance for the 1981 season through the 2019 season.
+</div>
+# Data Exploration and Visualization:
+
+```{r Exploration and Visualization 2, message=FALSE, echo=FALSE}
+# Count of drivers and constructors who have won races:
+selectData %>%
+  filter(finishingNumber == 1) %>%
+  summarise(countDriver = n_distinct(driverId), countConstructor = n_distinct(constructorId)) %>%
+  ggplot(.) +
+  geom_bar(aes(x = "Drivers", y = countDriver), stat = "identity", fill = "blue3") +
+  geom_bar(aes(x = "Constructors", y = countConstructor), stat = "identity", fill = "darkgreen") +
+  theme_minimal() +
+  ylab("count") +
+  xlab("group") +
+  ggtitle("Distinct Count of Winning Drivers and Constructors: 1950-2019")
+
+
+```
+
+- Winning is difficult and there have been theories around whether drivers or constructors play a larger role.
+- Let's examine this point in greater detail.
+
+
+```{r, echo=FALSE}
+# Focuses on race data from 1981 forward:
+f1Data = filter(selectData, year >= 1981)
+```
+
+# First Hypothesis:
+
+**Hypothesis 1**: constructors are more important to point outcomes by race event than drivers.  Thus, they will have a higher interclass correlation in a mixed model with random effects.
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+library(lme4)
+
+hypothesis1 = lmer(calculatedPoints ~ driverCount + eventCompetitivenessDriver + (1|driverId) + (1|constructorId),
+                   data = f1Data)
+
+summary(hypothesis1)
+```
+
+ICC = Intercept Variance / (Residual Variance + Intercept Variance)
+
+**Driver ICC** = `r round(((0.4161)/(3.9576 + 0.4161))*100, digits = 2)`%
+
+**Constructor ICC** = `r round(((0.4474)/(3.9576 + 0.4474))*100, digits = 2)`%
+
+- Support **for** hypothesis 1:
+    - ICC is greater for constructors and therefore provides indication that constructors hold a more important role in finishing points by race.
+
+<div class = "notes">
+Presentation Notes:
+
+Drivers and constructors are two important elements of F1 Racing.  While Drivers play crucial roles in navigating the tracks without the aid of their constructor, they would not have a car to race.  Drivers race for constructors and constructors play important roles in adjusting engineering features of the car.  In the current F1 setup, each constructor has two cars and thus two drivers.  Drivers and constructors compete in two separate championships based on the accumulation of race points.  It has long been discussed as to whether the driver or constructor plays a more critical role in success by circuits.
+
+Therefore, to test which plays a more important effect on points by race event, I will use a mixed model with random effects at both the driver and constructor level and will measure the interclass correlation for each.  In order to join the debate, I hypothesize the following.
+
+A few notes before diving into the model, as mentioned above drivers are nested within constructors, but some have switched teams over their careers.  Second, in this model I will control for both the driver count per race event and the competitiveness score of each race.  While these are not the primary variables of concern, this will help ensure more of a level playing field as points outcomes by driver and constructor are dependent on each.
+
+Based on this, constructors play a more important role in explaining the variance of outcomes in calculated points between 1981 and 2019 when compared with drivers.  Thus, there is some indication that **Hypothesis 1** is true.  However, the difference is small (0.6% difference) and both play a small role in the overall variance of outcomes in calculated points, which demonstrates that there are other key variables that should be considered.
+</div>
+# Second Hypothesis:
+
+Let's now focus on one specific track class to see whether drivers may be more important.
+
+- Visualizing the number of race events by track class:
+
+```{r,echo=FALSE}
+# Count of race events at each of the track classes under classification 1:
+f1Data %>%
+  group_by(raceId, classification_1) %>%
+  summarise(count = n_distinct(raceId)) %>%
+  group_by(classification_1) %>%
+  summarise(trackCount = sum(count)) %>%
+    ggplot(., aes(x = classification_1, y = trackCount)) + 
+    geom_bar(stat = "identity", fill = "blue2") +
+    theme_minimal() +
+    ggtitle("Count of Race Events at Each Circuit Class") +
+    ylab("race count") +
+    xlab("track class") +
+    ylim(0,600) +
+    geom_text(aes(label = trackCount), vjust=-0.8, size=4)
+```
+
+- In theory, street-class tracks require more focus from drivers as they are racing through city streets and therefore need to race with even more poise than at other track styles.
+
+<div class = "notes">
+Presentation Notes:
+
+My second hypothesis focuses on driver and constructor performance on one type of track class.  There are three major track classes in F1 racing: (1) race, (2) road, and (3) street.  Race-class tracks are ones at permanent facilities that are only used for racing.  Road-class tracks are ones that are a mix between city streets and permanent race facilities.  Street-class tracks are ones that take place on city streets.  The Monaco Grand Prix is a very famous example of a race that takes place at a street-class track.
+
+Street-class tracks require a great deal of poise for the driver as there is less room for error due to city streets being narrower than at a permanent race facility.  Therefore, drivers will likely play a more important role in the points outcome at these tracks versus others.
+</div>
+# Second Hypothesis:
+
+**Hypothesis 2**: at street-class tracks, drivers play a more important role on points outcomes than constructors.  Thus, for street-class tracks, drivers will have a higher interclass correlation in a mixed model with random effects.
+
+```{r, echo=FALSE}
+f1DataTrack = filter(f1Data, classification_1 == "Street")
+
+hypothesis2 = lmer(calculatedPoints ~ driverCount + eventCompetitivenessDriver + (1|driverId) + (1|constructorId),
+                   data = f1DataTrack)
+
+summary(hypothesis2)
+```
+
+ICC = Intercept Variance / (Residual Variance + Intercept Variance)
+
+**Driver ICC** = `r round(((0.368)/(4.176 + 0.368))*100, digits = 2)`%
+
+**Constructor ICC** = `r round(((0.524)/(4.176 + 0.524))*100, digits = 2)`%
+
+- Support **against** hypothesis 2:
+    - ICC is greater for constructors and therefore provides indication that constructors hold a more important role in finishing points by race at street-class tracks.
+    - Difference in ICC is larger here than in hypothesis 1.  Therefore, constructors may even be more important at street-class tracks.
+
+<div class = "notes">
+Presentation Notes:
+
+Again, in this model I will control for both the driver count per race event and the competitiveness score of each race.  While these are not the primary variables of concern, this will help ensure more of a level playing field as points outcomes by driver and constructor are dependent on each.
+
+Based on this model output, let's look at the interclass correlation scores for constructors and drivers.
+
+Based on this, at street-class tracks constructors actually play a more important role in explaining the variance of outcomes in calculated points between 1981 and 2019 when compared with drivers.  Thus, there is some indication that **Hypothesis 2** is incorrect. The difference (3.1%) is larger than in hypothesis 1 where all track classes were considered.  Both constructors and drivers play a small role in the overall variance of outcomes in calculated points, which demonstrates that there are other key variables that should be considered.  However, there is some indication based on this mixed model that constructors are even more important on street-class circuits, which is maybe not as intuitive given they seem to be more demanding on drivers.
+</div>
