@@ -1,0 +1,304 @@
+---
+title: "Advanced Statistical Inference"
+author: 'Homework #1 - Anthony Stachowski'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Bronze Tier
+
+Each task is worth 2 points.
+
+## Task 1
+
+Use the attrition data from the rsample package.
+
+```{r}
+library(rsample)
+
+data("attrition")
+```
+
+Engage in some data exploration by using `summary` functions.
+
+In addition to the `summary` function, the `describe` functions from the psych and Hmisc packages are great (but for slightly different purposes). Use any function you wish
+
+```{r, warning=FALSE}
+
+library(psych)
+
+head(attrition)
+summary(attrition)
+describe(attrition)
+
+```
+
+
+## Task 2
+
+How do those variables look? Do they appear to all make sense? Are there any extreme values? Are any of them coded in such a way that don't make sense? Discuss anything interesting that you found.
+
+Be sure to use the `str` function or the `glimpse` function from dplyr to check the structure of the data.
+
+```{r, warning=FALSE}
+
+library(dplyr)
+
+# Check for null values:
+missing = is.na(attrition)
+apply(missing,2,which)
+
+glimpse(attrition)
+
+```
+
+There are no missing values in the data frame based on the check of is.na.
+
+One major issue with this data frame from an analysis standpoint is that there is no date values.  Therefore, I do not know if this is a summary of information over a number of months or years.  At what point was this data collected and stopped?  Without this information it is hard to understand how attrition may be affecting the company.  Is this a snapshot in time or is it a compilation of years of data?
+
+There are some extreme values in the monthly income column that do not align with the monthly income rate.  However, this may be due to stock options being paid out during the given month.
+
+I also have some questions as to how some of the variables are collected.  Are they input by each person from a survey or are certain things assigned by the company?  For example, the variable WorkLifeBalance.  Is this something input by the employee and are they comparing it to their most recent previous role?
+
+There are also a few variables shown as integers that probably make more sense as factors or ordered factors: JobLevel and StockOptionLevel.
+
+## Task 3
+
+Pick at least 3 variables for which you want to explore relationships. Given any issues you found in Task 2, convert variables as needed with `as.factor` (forces a variable into a factor -- think about a nominal variable), `as.numeric` (forces a variable into a numeric), or anything else that you deem necessary (e.g., create new variables with `mutate`).
+
+```{r}
+
+library(tigerstats)
+
+attrition$JobLevel = as.ordered(attrition$JobLevel)
+attrition$StockOptionLevel = as.factor(attrition$StockOptionLevel)
+
+# Pearson correlation coefficient for continuous variables
+
+cor(attrition$MonthlyRate, attrition$MonthlyIncome)
+
+# Examining frequency by categorircal variables
+
+xtabs(~ Attrition + JobLevel, data=attrition)
+colPerc(xtabs(~ Attrition + JobLevel, data=attrition))
+
+xtabs(~ Attrition + Department, data=attrition)
+colPerc(xtabs(~ Attrition + Department, data=attrition))
+
+```
+
+
+## Task 4
+
+Using the ggplot2 package, create some visualizations. The structure of a ggplot object is as follows:
+
+```{r}
+
+ggplot(attrition, aes(x = MonthlyIncome, y = MonthlyRate)) + 
+  geom_point(alpha = 0.5)
+
+attrition %>%
+  group_by(Attrition) %>%
+ggplot(., aes(x = JobLevel, fill = Attrition)) +
+  geom_bar(position = "fill")
+
+attrition %>%
+  group_by(Attrition) %>%
+ggplot(., aes(x = JobLevel, fill = Attrition)) +
+  geom_bar()
+
+attrition %>%
+  group_by(Attrition) %>%
+ggplot(., aes(x = Department, fill = Attrition)) +
+  geom_bar(position = "fill")
+
+attrition %>%
+  group_by(Attrition) %>%
+ggplot(., aes(x = Department, fill = Attrition)) +
+  geom_bar()
+```
+
+
+Once you have produced a visualization, explain what it means. Naturally, good viz doesn't need explanation, but let's do it regardless!
+
+First Graph: this shows observations corresponding to monthly income and monthly rate.  If one's income was strictly a function of monthly rate, then we would expect the points to be strongly correlated in a positive manner.  However, there are no strong patterns of that nature.  There are some people with a low monthly rate that still have a very high monthly income or some people with a high monthly rate, but a monthly income that is much lower.  This could be due to how income is affected by more than just monthly rates (e.g. may include stock payouts).  Monthly rates could also be incentive based and thus monthly income could be lower if the incentives are not met.
+
+The next two charts reflect the same data presented differently.  The first is a stacked bar chart that shows percentages of attrition by job level.  As somewhat expected, attrition is higher for the lowest job level.  However, there is a bump at both job level 3 and 5, which are maybe less expected based on intuition.  The second of the charts is a stacked bar with frequency on the y-axis.  The greatest number of attrition occurrences happen at level 1, followed by level 2.
+
+Likewise, the next two charts reflect the same data (in this case department and attrition) presented differently.  The first is a stacked bar chart that shows percentages of attrition by department.  The highest percentage of attrition occurs in sales followed by human resources.  The second of the charts is a stacked bar with frequency on the y-axis.  The greatest number of attrition occurrences happen in the research department, which is somewhat expected given that most jobs fall in this department.  However, it is the lowest from a percentage basis.
+
+## Task 5
+
+Use the `simViz` function from inferviz to see how well you actually do in finding an actual relationship.
+
+```{r}
+library(inferviz)
+
+simViz(attrition, Age, HourlyRate, distractors = 5, answer = FALSE)
+```
+
+
+First, pick two new variables for relationship exploration -- make sure that you have not seen them before.
+
+When you run it the first time, keep the distractors argument at the default value. When asked if you want to see the real data select 1 (No). Now try it with more distractors (maybe 5 or 6).
+
+How did you do? Where you able to spot the real relationship or were you fooled by your basic human need for pattern finding?
+
+Discuss what you think this means.
+
+I was not able to spot any relationship between age and hourly rate.  I would generally expect there to be a loose correlation between age and hourly rate with the hourly rate increasing until a certain age and then some decline.  There are no visible patterns occurring in the graphs above.  This is hopefully intentional as it resembles the work we did around visual inference in class.  This is a test to ensure that when the variable selection is randomized there are no obvious patterns occurring.  It is a check to ensure that our data set is not strongly biased.
+
+# Silver Tier
+
+For up to 4 points, use the leadershipRatingsAgreement.csv file in the data folder. 
+
+You can use any of the following functions to read a csv file into R (from slow to fast):
+
+```{r, warning = FALSE}
+
+library(readr)
+
+url_data = "https://raw.githubusercontent.com/AS-72/R_Data/master/leadershipRatingsAgreement.csv"
+
+leadership_ratings = read_csv(url_data, col_names = TRUE)
+
+glimpse(leadership_ratings)
+
+# Check for null values and count the total by variable:
+missing_1 = colSums(is.na(leadership_ratings), dims = 1)
+missing_1
+
+# If you want to identy where in each variable the nulls are occuring:
+# apply(missing_1,2,which)
+
+```
+
+Which variables have the strongest positive relationship and which have the strongest negative relationship? Once you have found those relationships, plot them both.
+
+```{r}
+
+
+# As noted above, many of the variables have null values.
+# I will use the cor function (utlizing Pearson correlations) to test the strength 
+# of relationships between variables and will only use complete observations.   
+# This will eliminate counting rows where the value is not known.  This is not ideal, 
+# as observations are eliminated, but it allows some conclusion to be drawn based on
+# the available data.
+
+cor_matrix = cor(leadership_ratings, use = "complete.obs")
+round(cor_matrix,3)
+
+# After examining each pair of variables for correlation, the following have the highest
+# positive and negative correlation:
+
+# Vitality and Productivity - largest positive correlation
+# Vitality and Effect - largest negative correlation
+
+# Plots of the above correlations:
+
+ggplot(leadership_ratings, aes(x = vitality, y = productivity)) + 
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth(se = FALSE, color = "red")
+
+ggplot(leadership_ratings, aes(x = vitality, y = effect)) + 
+  geom_point(alpha = 0.25, color = "grey5") +
+  geom_smooth(method = "lm", se = FALSE, size = 1.25, color = "green") +
+  geom_smooth(se = FALSE, color = "blue", size = 1.25)
+
+
+```
+
+Which 4 variables have the strongest relationship with the effect variable? Explain how you found this relationship. Produce plots for each of those relationships and include both linear trend lines and smoothed trend lines
+
+```{r}
+
+# After examining each variable with effect for correlation, the following have the highest
+# correlation. I examined the above correlation matrix to determine this and have reprinted
+# them here:
+
+cor(leadership_ratings$forceful, leadership_ratings$effect, use = "complete.obs")
+cor(leadership_ratings$enabling, leadership_ratings$effect, use = "complete.obs")
+cor(leadership_ratings$strategic, leadership_ratings$effect, use = "complete.obs")
+cor(leadership_ratings$operational, leadership_ratings$effect, use = "complete.obs")
+
+# Plots of the above correlations:
+
+ggplot(leadership_ratings, aes(x = forceful, y = effect)) + 
+  geom_point(alpha = 0.25, color = "grey5") +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth(se = FALSE, color = "red")
+
+ggplot(leadership_ratings, aes(x = enabling, y = effect)) + 
+  geom_point(alpha = 0.25, color = "grey5") +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth(se = FALSE, color = "red")
+
+ggplot(leadership_ratings, aes(x = strategic, y = effect)) + 
+  geom_point(alpha = 0.25, color = "grey5") +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth(se = FALSE, color = "red")
+
+ggplot(leadership_ratings, aes(x = operational, y = effect)) + 
+  geom_point(alpha = 0.25, color = "grey5") +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth(se = FALSE, color = "red")
+
+```
+
+
+# Gold Tier
+
+For up to 6 points, use the leadership data found in the data folder. This is a .dta file (from Stata) and can be read in using the appropriate function from the haven package. 
+
+```{r}
+
+url = "https://github.com/AS-72/R_Data/blob/master/leadership?raw=true"
+
+leader = haven::read_dta(url)
+
+head(leader)
+```
+
+
+Using verbs from the dplyr package (specifically, `group_by` and `summarize`), find the *effect* mean for each leaderID. Which leader(s) had the highest effect mean and which leader(s) had the lowest effect mean.
+
+```{r}
+
+mean_effect = leader %>%
+  group_by(leaderID) %>%
+  summarise(leader_rating = mean(effect))
+
+mean_effect[which.max(mean_effect$leader_rating),]
+mean_effect[which.min(mean_effect$leader_rating),]
+
+```
+
+
+Take your highest and lowest leaders and keep the leaderID. With the leaderID in hand, find those leaders in the leadershipRatingsAgreement data.
+
+Excluding effect, construct a plot with forceful, enabling, strategic, operational, vitality, and productivity on the x-axis (the y-axis will contain the value for each variable). Next color the points by leaderID.
+
+```{r}
+
+library(tidyr)
+
+best_worst = leadership_ratings %>%
+  filter(leaderID == "1644" | leaderID == "1589")
+
+selected = best_worst %>%
+  select(-effect)
+
+leader_extremes = pivot_longer(selected, -leaderID, names_to = "category")
+leader_extremes$leaderID = as.factor(leader_extremes$leaderID)
+
+ggplot(leader_extremes,aes(x=category, y=value)) +
+  geom_point(aes(color=leaderID),size=3) +
+  labs(color = "Leader") +
+  scale_color_manual(labels = c("Worst Avg Effect (ID 1644)", "Best Avg Effect (ID 1589)"), values = c("red", "blue"))
+
+```
+
