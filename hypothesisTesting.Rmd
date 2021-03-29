@@ -1,0 +1,262 @@
+---
+title: "Homework 2"
+author: "Anthony Stachowski"
+date: "04/20/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+## The Data
+
+The data that we are using is available in the "data" folder and is called: teamPerc.RData.
+
+## What Makes An Effective Leader?
+
+Why are some people seen as effective leaders and others are not? Are there any behaviors or characteristics that can help us quantify what an effective leader looks like? 
+
+The data that we are using comes from a large survey of employees and their direct manager (i.e., each leader provided self-ratings and their direct subordinates provided rating about the leader -- this is reflected by the `Rater` variable). We are most interested in subordinate ratings. This data contains individual items and the scale score for those items. The scale are hierarchical and are constructed as follows:
+
+The *forceful* scale contains the following subscales: takesCharge, declares, pushes
+
+The *enabling* scale contains the following subscales: empowers, listens, supports
+
+The *strategic* scale contains the following subscales: direction, growth, innovation
+
+The *operational* scale contains the following subscales: execution, efficiency, order
+
+There are also a number of demographic variables within this data (e.g., age, experience, gender, tenure). 
+
+The main goal is explain the *effect* variable. You can use individual items, scale subscores, and/or scale scores. 
+
+### Bronze
+
+After examining the variables within the given data, generate at least 3 testable hypotheses; these should be generated before any visual exploration.
+
+```{r}
+library(repmis)
+library(dplyr)
+
+dataURL = "https://github.com/AS-72/R_Data/blob/master/teamPerc.RData?raw=True"
+
+source_data(dataURL)
+
+glimpse(teamPerc)
+
+```
+
+```{r}
+
+teamPerc$Rater = as.factor(teamPerc$Rater)
+table(teamPerc$Rater)
+
+teamPerc$leader_female = as.factor(teamPerc$leader_female)
+table(teamPerc$leader_female)
+```
+
+As we are focusing only on employees' ratings of their managers, I will filter out teamPerc to create a subset that only considers these data points (i.e. cases where Rater = 3):
+
+```{r}
+
+# Create a subset of data looking only at employee ratings:
+employeeRater = teamPerc %>%
+  filter(Rater == "3")
+```
+
+
+**Null Hypotheses:**
+
+1. The linear relationship between *execution* and *effect* is not different from zero (i.e. the coefficient of *execution* in a linear relationship with *effect* is equal to zero $$H_0: \beta_1=0$$)
+
+2. The linear relationship between *forceful* scale and *effect* is not different from zero (i.e. the coefficient of *forceful* in a linear relationship with *effect* is equal to zero $$H_0: \beta_1=0$$)
+
+3. The linear relationship between *leader_experience* and *effect* is not different from zero (i.e. the coefficient of *leader_experience* in a linear relationship with *effect* is equal to zero $$H_0: \beta_1=0$$)
+
+Conduct an *a priori* power analysis and determine the sample size needed for the effect size you would expect to achieve -- be conservative in your estimates. Without previous knowledge or research, you will have to think before just picking a number here. Remember that you might need to use the $f^2$ value and it can calculated as:
+
+$$f^2 = \frac{R^2_{adjusted}}{1 - R^2_{adjusted}}$$
+***A priori* Power Analysis**
+As all of my null hypotheses posit relationships between two variables, my u value in the power analysis is 1 (k-1).
+
+I will select a power level of 0.8 as this represents a 4:1 trade between Type II and Type I errors.
+
+I will select a signifiance level of $$\alpha=0.05$$ as this is generally used when evaluating statistical significance.
+
+For the effect size, I will use 0.5.  I am not familiar with any studies around measuring effective leadership.  When evaluating statistical models, an effect size of 0.5 would generally indicate moderate effects.  This equates to a $$R^2_{adjusted}$$ of 0.3333. Therefore, I think utilizing it as a starting point for evaluating power analysis is good estimate.
+
+
+```{r}
+library(pwr)
+
+pwr.f2.test(u = 1, v = NULL, f2 = 0.5, sig.level = 0.05, power = 0.8)
+
+```
+
+This power analysis indicates that I need at least a sample size of 17.83912 (v = n-2) to achieve an effect size of 0.5 assuming the other measures as noted above
+
+After conducting your power analysis, use linear regression to test your hypotheses and produce appropriate visualizations.
+
+
+Discuss the results of your model, both in terms of the model performance and your hypotheses. 
+
+**Linear Regression**
+
+1. The linear relationship between *execution* and *effect* is not different from zero (i.e. the coefficient of *execution* in a linear relationship with *effect* is equal to zero $$H_0: \beta_1=0$$)
+
+```{r}
+library(ggplot2)
+
+hypothesis1 = lm(effect ~ execution, data = employeeRater)
+
+summary(hypothesis1)
+
+ggplot(data = employeeRater, aes(x = execution, y = effect)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se=FALSE) +
+  theme_minimal()
+```
+
+The coefficient of *execution* is significant at p=0.001, which is certainly stronger than the significance level of 0.05 that was set during the *a priori* power analysis.  Therefore, based on reviewing the p-value of this linear model, we can reject the null hypothesis, as the coefficient of *execution* is different from zero as indicated by the p-value.  There is a positive relationship between *execution* and *effect*, as *execution* grows *effect* increases.
+
+However, even with being able to reject the null hypothesis, this model is still not very good.  The $$R^2_{adjusted}$$ is only 0.01354 and therefore *execution* does not explain much of the change in *effect*.  It is likely that additional variables would need to be added to create a better model for explaining the overall level of *effect*.
+
+2. The linear relationship between *forceful* scale and *effect* is not different from zero (i.e. the coefficient of *forceful* in a linear relationship with *effect* is equal to zero $$H_0: \beta_1=0$$)
+
+```{r}
+
+hypothesis2 = lm(effect ~ forceful, data = employeeRater)
+
+summary(hypothesis2)
+
+ggplot(data = employeeRater, aes(x = forceful, y = effect)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se=FALSE) +
+  theme_minimal()
+
+```
+
+The coefficient of *forceful* is significant at p=0.001, which is certainly stronger than the significance level of 0.05 that was set during the *a priori* power analysis.  Therefore, based on reviewing the p-value of this linear model, we can reject the null hypothesis, as the coefficient of *forceful* is different from zero as indicated by the p-value.  There is a negative relationship between *forceful* and *effect*, as *forceful* grows *effect* decreases.
+
+However, even with being able to reject the null hypothesis, this model is not even as good as the one proposed under null hypothesis 1.  The $$R^2_{adjusted}$$ is only 0.002216 and therefore *forceful* does not explain much of the change in *effect*.  It is likely that additional variables would need to be added to create a better model for explaining the overall level of *effect*.
+
+3. The linear relationship between *leader_experience* and *effect* is not different from zero (i.e. the coefficient of *leader_experience* in a linear relationship with *effect* is equal to zero $$H_0: \beta_1=0$$)
+
+```{r}
+
+hypothesis3 = lm(effect ~ leader_experience, data = employeeRater)
+
+summary(hypothesis3)
+
+ggplot(data = employeeRater, aes(x = leader_experience, y = effect)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se=FALSE) +
+  theme_minimal()
+```
+
+The coefficient of *leader_experience* is significant at p=0.001, which is certainly stronger than the significance level of 0.05 that was set during the *a priori* power analysis.  Therefore, based on reviewing the p-value of this linear model, we can reject the null hypothesis, as the coefficient of *leader_experience* is different from zero as indicated by the p-value.  There is a slight positive relationship between *leader_experience* and *effect*, as *leader_experience* grows *effect* increases.
+
+However, even with being able to reject the null hypothesis, this model is not as good as the one proposed under null hypothesis 1 or under null hypothesis 2.  The $$R^2_{adjusted}$$ is 0.002136 and therefore *leader_experience* does not explain much of the change in *effect*.  It is likely that additional variables would need to be added to create a better model for explaining the overall level of *effect*.
+
+### Silver
+
+Revise any of your analyses to include an interaction terms. Visualize this interaction and discuss what it means.
+
+I will examine our *effect* variable for an interaction effect between *execution* and *leader_female*.
+
+**Null Hypothesis:** the coefficients of *execution*, *leader_female* (binary variable where "1" indicates "female"), and the interaction term (*execution* x *leader_female*) are not different from zero in the linear regression.
+
+```{r}
+library(effects)
+
+reducedEmployeeRater = employeeRater %>%
+  filter(leader_female == "0" | leader_female == "1")
+
+hypothesis4 = lm(effect ~ execution*leader_female, data = reducedEmployeeRater)
+
+summary(hypothesis4)
+
+modelEffects = effect("execution * leader_female", hypothesis4)
+plot(modelEffects)
+```
+
+The coefficients of *execution*, *leader_female*, and the interaction term (*execution* x *leader_female*) are all significant at p=0.01 (*execution* and *leader_female* are significant at p=0.001), which is certainly stronger than the significance level of 0.05 that was set during the *a priori* power analysis.  Therefore, based on reviewing the p-value of this linear model, we can reject the null hypothesis as the coefficients of the variables are different from zero as indicated by the p-value.
+
+The modelEffects plot shows the effect of the interaction between *execution* and *leader_female* on *effect*.  If the leader is male (*leader_female* = 0), *execution* plays a stronger effect on the outcome of *effect*, which is indicated by the line in the plot having a larger slope than the plot for female leaders (*leader_female* = 1).  Female leaders do not see as large of an effect on *effect* as *execution* increases.  This is good for males who fall on the high side of *execution*, but they are seen as being less effective than their female counterparts when males are on the lower end of the *execution* scale.
+
+
+### Gold
+
+Conduct any form of resampling and discuss the output from your resampled results. How does the resultant distribution help to support your hypotheses?
+
+```{r}
+library(parallel)
+
+modelVars <- dplyr::select(employeeRater, effect, execution)
+
+bootstrapping <- function(df) {
+  df <- df
+  
+  sampledRows <- sample(1:nrow(df), nrow(df), replace = TRUE)
+  
+  df <- df[sampledRows, ]
+  
+  bsMod <- lm(effect ~ execution, data = df)
+  
+  results <- broom::tidy(bsMod)
+  
+  return(results)
+}
+
+timeRunner <- function(repNumber) {
+  replicate(repNumber, expr = {
+    out <- bootstrapping(modelVars)
+    out$number <- repNumber
+    return(out)
+  }, simplify = FALSE)
+}
+
+numberCores = detectCores() - 1
+
+cl <- parallel::makeCluster(numberCores)
+
+clusterExport(cl, c("modelVars", "timeRunner", "bootstrapping"))
+
+clusterEvalQ(cl, library(dplyr))
+
+residOut <- parLapply(cl, 1:100, function(x) timeRunner(x))
+
+stopCluster(cl)
+
+residOut <- purrr::flatten(residOut) %>% 
+  bind_rows(.)
+
+```
+```{r}
+
+meanEffect <- mean(residOut$estimate[residOut$term == "execution"])
+meanEffect
+
+meanIntercept <- mean(residOut$estimate[residOut$term == "(Intercept)"])
+meanIntercept
+
+ciUpper <- quantile(residOut$estimate[residOut$term == "execution"], .975)
+ciUpper
+
+ciLower <- quantile(residOut$estimate[residOut$term == "execution"], .025)
+ciLower
+
+hypothesis1$coefficients
+
+ggplot(residOut[residOut$term == "execution", ], aes(estimate)) +
+  geom_histogram(fill = "slategray1") +
+  geom_vline(xintercept = ciLower) +
+  geom_vline(xintercept = ciUpper) +
+  geom_vline(xintercept = meanEffect) +
+  geom_vline(xintercept = summary(hypothesis1)$coefficients["execution","Estimate"], color = "red", 
+             size = 0.75, linetype = "dashed") + 
+  theme_minimal()
+```
+
+The resultant distribution lends support to reject null hypothesis 1 as was indicated by our initial regression model.  The distribution from the bootstrapping procedure generates a 95% confidence interval that falls between 0.420 and 0.642.  This does not contain the value 0 and thus we can be 95% confident that the variable *execution* has an effect on the variable *effect* that is other than zero, in this case it is indicating that it has a positive effect somewhere between 0.420 and 0.642.  Therefore, the bootstrapping procedure gives further support for rejecting Null Hypothesis 1.
